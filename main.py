@@ -1,8 +1,8 @@
 from typing import List, Optional
-from fastapi import FastAPI, Query, Path
+from fastapi import FastAPI, Query, Path, Body
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, HttpUrl
 
 app = FastAPI(title='teste FastAPI', version='0.1.1', description='Uma Api de teste')
 
@@ -11,6 +11,7 @@ class ModelName(str, Enum):
     alexnet = 'alexnet'
     restnet = 'restnet'
     lenet = 'lenet'
+
 
 
 @app.get('/models/{model_name}')
@@ -96,8 +97,8 @@ async def read_user_item3(
 
 class Item(BaseModel):
     name: str
-    description: str | None = None
-    price : float
+    description: str | None = Field(None, title='the description of item', max_length=300)
+    price : float = Field(..., gt=0, description='the price must be greate than zero')
     tax : float | None = None
 
 
@@ -201,4 +202,206 @@ async def read_items11(
     return results
 
 
-#https://fastapi.tiangolo.com/pt/tutorial/path-params-numeric-validations/#number-validations-floats-greater-than-and-less-than
+#Floats greater than and less than
+
+@app.get('/items12/{item_id}')
+async def read_item12(
+    *,
+    item_id: int = Path(..., title='The Id of the item to get', gt=0, le=1000),
+    q: str,
+    size: float = Query(..., gt=0, lt=10.5)
+):
+    result = {'item_id': item_id}
+    if q:
+        result.update({'q':q})
+    return result
+
+
+#mix Path, query and Body parameters
+
+@app.put('/items13/{item_id}')
+async def update_item13(
+    *,
+    item_id: int = Path(..., title='The Id of the item to get', gt=0, le=1000),
+    q: str | None = None,
+    item: Item | None = None,
+):
+    results = {"item_id": item_id}
+    if q:
+        results.update({"q": q})
+    if item:
+        results.update({"item": item})
+    return results
+
+#Multiple body parameters
+
+class User(BaseModel):
+    username: str
+    full_name: str | None = None
+
+@app.put("/items14/{item_id}")
+async def update_item14(item_id: int, item: Item, user: User):
+    results = {"item_id": item_id, "item": item, "user": user}
+    return results
+
+#Singular values in body
+@app.put("/items15/{item_id}")
+async def update_item(
+    item_id: int, item: Item, user: User = Body(..., title="Usuario", description='O usuario que está fazendo a operação'), importance: int = Body(..., title='1alguma coisa', description='abccs')
+):
+    results = {"item_id": item_id, "item": item, "user": user, "importance": importance}
+    return results
+
+#Multiple body params and query
+@app.put("/items16/{item_id}")
+async def update_item(
+    *,
+    item_id: int,
+    item: Item,
+    user: User,
+    importance: int = Body(..., gt=0),
+    q: str | None = None
+):
+    results = {"item_id": item_id, "item": item, "user": user, "importance": importance}
+    if q:
+        results.update({"q": q})
+    return results
+
+#Embed a single body parameter
+@app.put("/items17/{item_id}")
+async def update_item(item_id: int, item: Item = Body(..., embed=True)):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#body - Nested Models
+
+class Item2(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: list[str] = []
+
+
+@app.put("/items18/{item_id}")
+async def update_item(item_id: int, item: Item2):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#Set types
+"""Para Valores que não se repetem usamos o método Set, ele vai receber os valores duplicados e transformar em valores unícos"""
+
+class Item3(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: set[str] = set() #Valores unicos
+
+
+@app.put("/items19/{item_id}")
+async def update_item(item_id: int, item: Item3):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#Nested Models 
+"""Modelos Mistos, (ou alinhados) servem para trabalhar com Modelos dentro de modelos."""
+
+class Image(BaseModel):
+    url: HttpUrl
+    name: str
+
+class Item4(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: set[str] = []
+    image: Image | None = None
+
+@app.put("/items20/{item_id}")
+async def update_item(item_id: int, item: Item4):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#Attributes with lists of submodels
+
+class Item5(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+    tags: set[str] = set()
+    images: list[Image] | None = None
+
+
+
+@app.put("/items21/{item_id}")
+async def update_item(item_id: int, item: Item5):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#Deeply nested models
+
+class Offer(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    items: list[Item5]
+
+@app.post("/offers/")
+async def create_offer(offer: Offer):
+    return offer
+
+
+#Bodies of pure lists
+@app.post("/images/multiple/")
+async def create_multiple_images(images: list[Image]):
+    return images
+
+#Bodies of arbitrary dicts
+@app.post("/index-weights/")
+async def create_index_weights(weights: dict[int, float]):
+    return weights
+
+#Declare Request Example Data
+#Pydantic schema_extra
+
+class Item6(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "name": "Foo",
+                "description": "A very nice Item",
+                "price": 35.4,
+                "tax": 3.2,
+            }
+        }
+
+
+@app.put("/items23/{item_id}")
+async def update_item(item_id: int, item: Item6):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#Field additional arguments
+class Item7(BaseModel):
+    name: str = Field(..., example="Foo")
+    description: str | None = Field(None, example="A very nice Item")
+    price: float = Field(..., example=35.4)
+    tax: float | None = Field(None, example=3.2)
+
+
+@app.put("/items24/{item_id}")
+async def update_item(item_id: int, item: Item7):
+    results = {"item_id": item_id, "item": item}
+    return results
+
+#https://fastapi.tiangolo.com/pt/tutorial/schema-extra-example/#field-additional-arguments
+#https://pydantic-docs.helpmanual.io/usage/types/
+#https://medium.com/data-hackers/como-criar-a-sua-primeira-api-em-python-com-o-fastapi-50b1d7f5bb6d
