@@ -1,0 +1,1 @@
+# https://fastapi.tiangolo.com/pt/tutorial/handling-errors/#handling-errors
