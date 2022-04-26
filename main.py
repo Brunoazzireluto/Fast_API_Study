@@ -1,11 +1,11 @@
 from typing import List, Optional
-from fastapi import FastAPI, Query, Path, Body, Cookie
+from fastapi import FastAPI, Query, Path, Body, Cookie, Header
 from enum import Enum
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from datetime import datetime, time, timedelta
 from uuid import UUID
 
-app = FastAPI(title='teste FastAPI', version='0.1.1', description='Uma Api de teste')
+app = FastAPI(title='teste FastAPI', version='0.1.1', description='Uma Api de teste',)
 
 
 # Definindo parametros prédefinidos
@@ -547,7 +547,108 @@ async def read_items(ads_id: str | None = Cookie(None)):
 
 
 # Header Parameters
+@app.get("/items-header/")
+async def read_items(user_agent: str | None = Header(None)):
+    return {"User-Agent": user_agent}
 
-# https://fastapi.tiangolo.com/pt/tutorial/header-params/#header-parameters
+
+@app.get("/strange-header/")
+async def read_items(
+    strange_header: str | None = Header(None, convert_underscores=False)
+):
+    return {"strange_header": strange_header}
+
+
+# Duplicate headers
+@app.get("/duplicate-headers/")
+async def read_items(x_token: list[str] | None = Header(None)):
+    return {"X-Token values": x_token}
+
+
+# Response Model
+
+@app.post("/items-response/", response_model=Item, )
+async def create_item(item: Item):
+    return item
+
+
+# Return the same input data
+class UserIn(BaseModel):
+    username: str
+    password: str
+    email: EmailStr
+    full_name: str | None = None
+
+@app.post('/user/', response_model=UserIn)
+async def create_user(user:UserIn):
+    return user
+
+# Add a output model
+class UserOut(BaseModel):
+    username: str
+    email: EmailStr
+    full_name: str | None = None
+
+@app.post("/user-with-response/", response_model=UserOut)
+async def create_user(user: UserIn):
+    return user
+
+
+# Response Model encoding parameters
+class Item10(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float = 10.5
+    tags: list[str] = []
+
+items = {
+    "foo": {"name": "Foo", "price": 50.2},
+    "bar": {"name": "Bar", "description": "The bartenders", "price": 62, "tax": 20.2},
+    "baz": {"name": "Baz", "description": None, "price": 50.2, "tax": 10.5, "tags": []},
+}
+
+@app.get("/items28/{item_id}", response_model=Item10, response_model_exclude_unset=True)
+async def read_item(item_id: str):
+    return items[item_id]
+
+
+# response_model_include and response_model_exclude
+items2 = {
+    "foo": {"name": "Foo", "price": 50.2},
+    "bar": {"name": "Bar", "description": "The Bar fighters", "price": 62, "tax": 20.2},
+    "baz": {
+        "name": "Baz",
+        "description": "There goes my baz",
+        "price": 50.2,
+        "tax": 10.5,
+    },
+}
+
+@app.get(
+    "/items29/{item_id}/name",
+    response_model=Item,
+    response_model_include={"name", "description"},
+)
+async def read_item_name(item_id: str):
+    return items2[item_id]
+
+
+@app.get("/items30/{item_id}/public", response_model=Item, response_model_exclude={"tax"})
+async def read_item_public_data(item_id: str):
+    return items2[item_id]
+
+
+# Using lists instead of sets
+@app.get(
+    "/items31/{item_id}/name",
+    response_model=Item,
+    response_model_include=["name", "description"],
+)
+async def read_item_name(item_id: str):
+    return items2[item_id]
+
+
+
 # https://pydantic-docs.helpmanual.io/usage/types/
 # https://medium.com/data-hackers/como-criar-a-sua-primeira-api-em-python-com-o-fastapi-50b1d7f5bb6d
