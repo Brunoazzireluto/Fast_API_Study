@@ -28,3 +28,6 @@ uvicorn==0.17.6
 uvloop==0.16.0
 watchgod==0.8.2
 websockets==10.3
+
+SQLAlchemy~=1.4.36
+dat~=1.0.0
