@@ -1,5 +1,5 @@
-import owner as owner
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 
 class ItemBase(BaseModel):
     title: str
@@ -19,7 +19,7 @@ class Item(ItemBase):
 
 
 class UserBase(BaseModel):
-    email: str
+    email: str = Field(title="Email do usuario")
 
 
 class UserCreate(UserBase):
